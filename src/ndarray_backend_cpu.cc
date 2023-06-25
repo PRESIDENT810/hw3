@@ -56,15 +56,31 @@ void Compact(const AlignedArray& a, AlignedArray* out, std::vector<uint32_t> sha
    *   out: compact version of the array to be written
    *   shape: shapes of each dimension for a and out
    *   strides: strides of the *a* array (not out, which has compact strides)
-   *   offset: offset of the *a* array (not out, which has zero offset, being compact)
+   *   offset: offset of the *a* array (not out, which has zero offset, being
+   * compact)
    *
    * Returns:
-   *  void (you need to modify out directly, rather than returning anything; this is true for all the
-   *  function will implement here, so we won't repeat this note.)
+   *  void (you need to modify out directly, rather than returning anything;
+   * this is true for all the function will implement here, so we won't repeat
+   * this note.)
    */
-  /// BEGIN YOUR SOLUTION
-  
-  /// END YOUR SOLUTION
+  int dims = shape.size();
+  auto currentIndices = std::vector<int>(dims, 0);
+  int cnt = 0;
+  while (cnt != out->size) {
+    int currentPtr = offset;
+    for (int i = dims - 1; i >= 0; i--) {
+      if (currentIndices[i] == shape[i] && i != 0) {
+        currentIndices[i - 1]++;
+        currentIndices[i] = 0;
+      }
+      currentPtr += currentIndices[i] * strides[i];
+    }
+    out->ptr[cnt] = a.ptr[currentPtr];
+    currentIndices[dims - 1]++;
+    cnt++;
+  }
+  return;
 }
 
 void EwiseSetitem(const AlignedArray& a, AlignedArray* out, std::vector<uint32_t> shape,
@@ -79,9 +95,24 @@ void EwiseSetitem(const AlignedArray& a, AlignedArray* out, std::vector<uint32_t
    *   strides: strides of the *out* array (not a, which has compact strides)
    *   offset: offset of the *out* array (not a, which has zero offset, being compact)
    */
-  /// BEGIN YOUR SOLUTION
-  
-  /// END YOUR SOLUTION
+  int dims = shape.size();
+  auto currentIndices = std::vector<int>(dims, 0);
+  int cnt = 0;
+  while (cnt != a.size) {
+    int currentPtr = offset;
+    for (int i = dims - 1; i >= 0; i--) {
+      if (currentIndices[i] == shape[i] && i != 0) {
+        currentIndices[i - 1]++;
+        currentIndices[i] = 0;
+      }
+      currentPtr += currentIndices[i] * strides[i];
+    }
+    assert(currentPtr < out->size);
+    out->ptr[currentPtr] = a.ptr[cnt];
+    currentIndices[dims - 1]++;
+    cnt++;
+  }
+  return;
 }
 
 void ScalarSetitem(const size_t size, scalar_t val, AlignedArray* out, std::vector<uint32_t> shape,
@@ -90,7 +121,7 @@ void ScalarSetitem(const size_t size, scalar_t val, AlignedArray* out, std::vect
    * Set items is a (non-compact) array
    *
    * Args:
-   *   size: number of elements to write in out array (note that this will note be the same as
+   *   size: number of elements to write in out array (note that this will not be the same as
    *         out.size, because out is a non-compact subset array);  it _will_ be the same as the
    *         product of items in shape, but convenient to just pass it here.
    *   val: scalar value to write to
@@ -99,10 +130,24 @@ void ScalarSetitem(const size_t size, scalar_t val, AlignedArray* out, std::vect
    *   strides: strides of the out array
    *   offset: offset of the out array
    */
-
-  /// BEGIN YOUR SOLUTION
-  
-  /// END YOUR SOLUTION
+  int dims = shape.size();
+  auto currentIndices = std::vector<int>(dims, 0);
+  int cnt = 0;
+  while (cnt != size) {
+    int currentPtr = offset;
+    for (int i = dims - 1; i >= 0; i--) {
+      if (currentIndices[i] == shape[i] && i != 0) {
+        currentIndices[i - 1]++;
+        currentIndices[i] = 0;
+      }
+      currentPtr += currentIndices[i] * strides[i];
+    }
+    assert(currentPtr < out->size);
+    out->ptr[currentPtr] = val;
+    currentIndices[dims - 1]++;
+    cnt++;
+  }
+  return;
 }
 
 void EwiseAdd(const AlignedArray& a, const AlignedArray& b, AlignedArray* out) {

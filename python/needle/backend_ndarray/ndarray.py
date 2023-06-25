@@ -244,10 +244,6 @@ class NDArray:
             raise ValueError
         if prod(self.shape) != prod(new_shape):
             raise ValueError
-        if self.compact_strides(self.shape) != self.strides:
-            # If permuted, we have to copy
-            compacted = self.compact()
-            return NDArray.make(new_shape, strides=None, device=self._device, handle=compacted._handle, offset=self._offset)
         return NDArray.make(new_shape, strides=None, device=self._device, handle=self._handle, offset=self._offset)
 
 
@@ -367,7 +363,7 @@ class NDArray:
         new_offset = self._offset
         for i, s in enumerate(idxs):
             assert s.step >= 0
-            new_shape[i] = s.stop - s.start
+            new_shape[i] = (s.stop - s.start + s.step - 1) // s.step
             new_stride[i] *= s.step
             new_offset += s.start * self.strides[i]
         new_shape = tuple(new_shape)
