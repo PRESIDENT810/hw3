@@ -247,32 +247,6 @@ void EwiseTanh(const AlignedArray& a, AlignedArray* out) {
   }
 }
 
-
-
-/**
- * In the code the follows, use the above template to create analogous element-wise
- * and and scalar operators for the following functions.  See the numpy backend for
- * examples of how they should work.
- *   - EwiseMul, ScalarMul
- *   - EwiseDiv, ScalarDiv
- *   - ScalarPower
- *   - EwiseMaximum, ScalarMaximum
- *   - EwiseEq, ScalarEq
- *   - EwiseGe, ScalarGe
- *   - EwiseLog
- *   - EwiseExp
- *   - EwiseTanh
- *
- * If you implement all these naively, there will be a lot of repeated code, so
- * you are welcome (but not required), to use macros or templates to define these
- * functions (however you want to do so, as long as the functions match the proper)
- * signatures above.
- */
-
-/// BEGIN YOUR SOLUTION
-
-/// END YOUR SOLUTION
-
 void Matmul(const AlignedArray& a, const AlignedArray& b, AlignedArray* out, uint32_t m, uint32_t n,
             uint32_t p) {
   /**
@@ -358,10 +332,15 @@ void ReduceMax(const AlignedArray& a, AlignedArray* out, size_t reduce_size) {
    *   out: compact array to write into
    *   reduce_size: size of the dimension to reduce over
    */
-
-  /// BEGIN YOUR SOLUTION
-  
-  /// END YOUR SOLUTION
+  for (int step = 0; step < out->size; step++){
+    int basePtr = step * reduce_size;
+    auto maxElement = a.ptr[basePtr];
+    for (int i = 0; i < reduce_size; i++){
+      maxElement = std::max(maxElement, a.ptr[basePtr+i]);
+    }
+    out->ptr[step] = maxElement;
+  }
+  return;
 }
 
 void ReduceSum(const AlignedArray& a, AlignedArray* out, size_t reduce_size) {
@@ -374,9 +353,15 @@ void ReduceSum(const AlignedArray& a, AlignedArray* out, size_t reduce_size) {
    *   reduce_size: size of the dimension to reduce over
    */
 
-  /// BEGIN YOUR SOLUTION
-  
-  /// END YOUR SOLUTION
+  for (int step = 0; step < out->size; step++){
+    int basePtr = step * reduce_size;
+    scalar_t sumElement = 0;
+    for (int i = 0; i < reduce_size; i++){
+      sumElement = sumElement + a.ptr[basePtr+i];
+    }
+    out->ptr[step] = sumElement;
+  }
+  return;
 }
 
 }  // namespace cpu
