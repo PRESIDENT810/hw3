@@ -261,10 +261,15 @@ void Matmul(const AlignedArray& a, const AlignedArray& b, AlignedArray* out, uin
    *   n: columns of a / rows of b
    *   p: columns of b / out
    */
-
-  /// BEGIN YOUR SOLUTION
-  
-  /// END YOUR SOLUTION
+  for (int i = 0; i < m; i++){
+    for (int j = 0; j < p; j++){
+      out->ptr[i*p+j] = 0;
+      for (int k = 0; k < n; k++){
+        out->ptr[i*p+j] += a.ptr[i*n+k] * b.ptr[k*p+j];
+      }
+    }
+  }
+  return;
 }
 
 inline void AlignedDot(const float* __restrict__ a,
@@ -292,9 +297,14 @@ inline void AlignedDot(const float* __restrict__ a,
   b = (const float*)__builtin_assume_aligned(b, TILE * ELEM_SIZE);
   out = (float*)__builtin_assume_aligned(out, TILE * ELEM_SIZE);
 
-  /// BEGIN YOUR SOLUTION
-  
-  /// END YOUR SOLUTION
+  for (int i = 0; i < TILE; i++){
+    for (int j = 0; j < TILE; j++){
+      for (int k = 0; k < TILE; k++){
+        out[i*TILE+j] += a[i*TILE+k] * b[k*TILE+j];
+      }
+    }
+  }
+  return;
 }
 
 void MatmulTiled(const AlignedArray& a, const AlignedArray& b, AlignedArray* out, uint32_t m,
@@ -318,9 +328,21 @@ void MatmulTiled(const AlignedArray& a, const AlignedArray& b, AlignedArray* out
    *   p: columns of b / out
    *
    */
-  /// BEGIN YOUR SOLUTION
-  
-  /// END YOUR SOLUTION
+  Fill(out, 0);
+  for (int i = 0; i < m / TILE; i++){
+    for (int j = 0; j < p / TILE; j++){
+      // blockC: c[i][j] with size=TILE*TILE
+      scalar_t* blockOut = out->ptr+((i*p/TILE+j)*TILE*TILE);
+      for (int k = 0; k < n / TILE; k++){
+        // blockA: a[i][k] with size=TILE*TILE
+        scalar_t* blockA = a.ptr+((i*n/TILE+k)*TILE*TILE);
+        // blockB: b[j][k] with size=TILE*TILE
+        scalar_t* blockB = b.ptr+((k*p/TILE+j)*TILE*TILE);
+        AlignedDot(blockA, blockB, blockOut);
+      }
+    }
+  }
+  return;
 }
 
 void ReduceMax(const AlignedArray& a, AlignedArray* out, size_t reduce_size) {
