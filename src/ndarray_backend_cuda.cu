@@ -89,6 +89,21 @@ __device__ void CompactStride(CudaVec &shape, CudaVec *compactedStride){
   }
 }
 
+__device__ void OffsetToCoordinate(CudaVec& shape, CudaVec& compactedStride, int index, CudaVec* pos){
+  for (int i = 0; i < shape.size; i++){
+    pos->data[i] = index / compactedStride.data[i];
+    index %= compactedStride.data[i];
+  }
+}
+
+__device__ uint32_t DotProd(CudaVec& a, CudaVec& b){
+  uint32_t prod = 0;
+  for (int i = 0; i < a.size; i++){
+    prod += a.data[i] * b.data[i];
+  }
+  return prod;
+}
+
 
 __global__ void CompactKernel(const scalar_t* a, scalar_t* out, size_t size, CudaVec shape,
                               CudaVec strides, size_t offset) {
@@ -113,14 +128,8 @@ __global__ void CompactKernel(const scalar_t* a, scalar_t* out, size_t size, Cud
   CudaVec pos;
   pos.size = shape.size;
   int index = gid;
-  for (int i = 0; i < shape.size; i++){
-    pos.data[i] = index / compactedStride.data[i];
-    index %= compactedStride.data[i];
-  }
-  int ptr = offset;
-  for (int i = 0; i < shape.size; i++){
-    ptr += pos.data[i] * strides.data[i];
-  }
+  OffsetToCoordinate(shape, compactedStride, index, &pos);
+  uint32_t ptr = offset+DotProd(pos, strides);
   out[gid] = a[ptr];
   return;
 }
@@ -158,14 +167,8 @@ __global__ void EwiseSetitemKernel(const scalar_t* a, scalar_t* out, size_t size
   CompactStride(shape, &compactedStride);  CudaVec pos;
   pos.size = shape.size;
   int index = gid;
-  for (int i = 0; i < shape.size; i++){
-    pos.data[i] = index / compactedStride.data[i];
-    index %= compactedStride.data[i];
-  }
-  int ptr = offset;
-  for (int i = 0; i < shape.size; i++){
-    ptr += pos.data[i] * strides.data[i];
-  }
+  OffsetToCoordinate(shape, compactedStride, index, &pos);
+  uint32_t ptr = offset+DotProd(pos, strides);
   out[ptr] = a[gid];
   return;
 }
@@ -201,14 +204,8 @@ __global__ void ScalarSetitemKernel(scalar_t val, scalar_t* out, size_t size, Cu
   CudaVec pos;
   pos.size = shape.size;
   int index = gid;
-  for (int i = 0; i < shape.size; i++){
-    pos.data[i] = index / compactedStride.data[i];
-    index %= compactedStride.data[i];
-  }
-  int ptr = offset;
-  for (int i = 0; i < shape.size; i++){
-    ptr += pos.data[i] * strides.data[i];
-  }
+  OffsetToCoordinate(shape, compactedStride, index, &pos);
+  uint32_t ptr = offset+DotProd(pos, strides);
   out[ptr] = val;
   return;
 }
