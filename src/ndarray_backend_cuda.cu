@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <cuda_runtime.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
@@ -79,7 +80,14 @@ void Fill(CudaArray* out, scalar_t val) {
 
 // Untility function to convert contiguous index i to memory location from strides
 
-
+__device__ void CompactStride(CudaVec &shape, CudaVec *compactedStride){
+  compactedStride->size = shape.size;
+  int baseStride = 1;
+  for (int i = shape.size-1; i >= 0; i--){
+    compactedStride->data[i] = baseStride;
+    baseStride *= shape.data[i];
+  }
+}
 
 
 __global__ void CompactKernel(const scalar_t* a, scalar_t* out, size_t size, CudaVec shape,
@@ -93,14 +101,28 @@ __global__ void CompactKernel(const scalar_t* a, scalar_t* out, size_t size, Cud
    *   out: CUDA point to out array
    *   size: size of out array
    *   shape: vector of shapes of a and out arrays (of type CudaVec, for past passing to CUDA kernel)
-   *   strides: vector of strides of out array
+   *   strides: vector of strides of a array
    *   offset: offset of out array
    */
   size_t gid = blockIdx.x * blockDim.x + threadIdx.x;
-
-  /// BEGIN YOUR SOLUTION
-  
-  /// END YOUR SOLUTION
+  if (gid >= size){
+    return;
+  }
+  CudaVec compactedStride;
+  CompactStride(shape, &compactedStride);
+  CudaVec pos;
+  pos.size = shape.size;
+  int index = gid;
+  for (int i = 0; i < shape.size; i++){
+    pos.data[i] = index / compactedStride.data[i];
+    index %= compactedStride.data[i];
+  }
+  int ptr = offset;
+  for (int i = 0; i < shape.size; i++){
+    ptr += pos.data[i] * strides.data[i];
+  }
+  out[gid] = a[ptr];
+  return;
 }
 
 void Compact(const CudaArray& a, CudaArray* out, std::vector<uint32_t> shape,
@@ -126,7 +148,27 @@ void Compact(const CudaArray& a, CudaArray* out, std::vector<uint32_t> shape,
                                          VecToCuda(strides), offset);
 }
 
-
+__global__ void EwiseSetitemKernel(const scalar_t* a, scalar_t* out, size_t size, CudaVec shape,
+                              CudaVec strides, size_t offset) {
+  size_t gid = blockIdx.x * blockDim.x + threadIdx.x;
+  if (gid >= size){
+    return;
+  }
+  CudaVec compactedStride;
+  CompactStride(shape, &compactedStride);  CudaVec pos;
+  pos.size = shape.size;
+  int index = gid;
+  for (int i = 0; i < shape.size; i++){
+    pos.data[i] = index / compactedStride.data[i];
+    index %= compactedStride.data[i];
+  }
+  int ptr = offset;
+  for (int i = 0; i < shape.size; i++){
+    ptr += pos.data[i] * strides.data[i];
+  }
+  out[ptr] = a[gid];
+  return;
+}
 
 
 void EwiseSetitem(const CudaArray& a, CudaArray* out, std::vector<uint32_t> shape,
@@ -142,11 +184,34 @@ void EwiseSetitem(const CudaArray& a, CudaArray* out, std::vector<uint32_t> shap
    *   strides: strides of the *out* array (not a, which has compact strides)
    *   offset: offset of the *out* array (not a, which has zero offset, being compact)
    */
-  /// BEGIN YOUR SOLUTION
   
-  /// END YOUR SOLUTION
+  CudaDims dim = CudaOneDim(a.size);
+  EwiseSetitemKernel<<<dim.grid, dim.block>>>(a.ptr, out->ptr, a.size, VecToCuda(shape),
+                                         VecToCuda(strides), offset);
 }
 
+__global__ void ScalarSetitemKernel(scalar_t val, scalar_t* out, size_t size, CudaVec shape,
+                              CudaVec strides, size_t offset) {
+  size_t gid = blockIdx.x * blockDim.x + threadIdx.x;
+  if (gid >= size){
+    return;
+  }
+  CudaVec compactedStride;
+  CompactStride(shape, &compactedStride);
+  CudaVec pos;
+  pos.size = shape.size;
+  int index = gid;
+  for (int i = 0; i < shape.size; i++){
+    pos.data[i] = index / compactedStride.data[i];
+    index %= compactedStride.data[i];
+  }
+  int ptr = offset;
+  for (int i = 0; i < shape.size; i++){
+    ptr += pos.data[i] * strides.data[i];
+  }
+  out[ptr] = val;
+  return;
+}
 
 
 
@@ -165,9 +230,10 @@ void ScalarSetitem(size_t size, scalar_t val, CudaArray* out, std::vector<uint32
    *   strides: strides of the out array
    *   offset: offset of the out array
    */
-  /// BEGIN YOUR SOLUTION
-  
-  /// END YOUR SOLUTION
+
+  CudaDims dim = CudaOneDim(size);
+  ScalarSetitemKernel<<<dim.grid, dim.block>>>(val, out->ptr, size, VecToCuda(shape),
+                                         VecToCuda(strides), offset);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
