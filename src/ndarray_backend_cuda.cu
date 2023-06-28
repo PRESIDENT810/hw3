@@ -1,5 +1,6 @@
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <cuda_runtime.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
@@ -470,9 +471,22 @@ void EwiseTanh(const CudaArray& a, CudaArray* out) {
   EwiseTanhKernel<<<dim.grid, dim.block>>>(a.ptr, out->ptr, out->size);
 }
 
+__global__ void MatmulKernel(const scalar_t* a, const scalar_t* b, scalar_t* out, uint32_t m, uint32_t n, uint32_t p){
+  size_t gid = blockIdx.x * blockDim.x + threadIdx.x;
+  if (gid >= m * p) return;
+  size_t i = gid / p; // Ranging from 0 to M
+  size_t j = gid % p; // Randing from 0 to P
+  // This thread to the dot product of row x of a (of size n), and column y of b (of size n)
+  scalar_t dotProd = 0;
+  for (size_t k = 0; k < n; k++){
+    dotProd += a[i*n+k] * b[k*p+j];
+  }
+  out[gid] = dotProd;
+  return;
+}
 
-void Matmul(const CudaArray& a, const CudaArray& b, CudaArray* out, uint32_t M, uint32_t N,
-            uint32_t P) {
+void Matmul(const CudaArray& a, const CudaArray& b, CudaArray* out, uint32_t m, uint32_t n,
+            uint32_t p) {
   /**
    * Multiply two (compact) matrices into an output (also comapct) matrix.  You will want to look
    * at the lecture and notes on GPU-based linear algebra to see how to do this.  Since ultimately
@@ -495,9 +509,8 @@ void Matmul(const CudaArray& a, const CudaArray& b, CudaArray* out, uint32_t M, 
    *   P: columns of b / out
    */
 
-  /// BEGIN YOUR SOLUTION
-  
-  /// END YOUR SOLUTION
+  CudaDims dim = CudaOneDim(m * p);
+  MatmulKernel<<<dim.grid, dim.block>>>(a.ptr, b.ptr, out->ptr, m, n, p);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
